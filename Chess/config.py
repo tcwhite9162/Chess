@@ -6,19 +6,22 @@ SCREEN_HEIGHT = 640
 BOARD_SIZE = 8
 SQUARE_SIZE = 80  # Square size
 RADIUS = 6        # Radius of legal move circles
+CAPTURE_RING_WIDTH = 8    # Thickness of ring rendered on captures
+CHECK_BORDER_WIDTH = 4    # Thickness of border around king's square when in check
 
 BOARD_ORIGIN_X = 0  # Left margin
 BOARD_ORIGIN_Y = 0  # Top margin
 
 SIDEBAR_WIDTH = SCREEN_WIDTH - (BOARD_SIZE * SQUARE_SIZE) - BOARD_ORIGIN_X * 2  # Remaining space
 
-STARTING_POSITION = [
-                    [Piece("b", p, SQUARE_SIZE)   for p in ["r", "n", "b", "q", "k", "b", "n", "r"]],
-                    [Piece("b", "p", SQUARE_SIZE) for _ in range(8)],
-                   *[[None] * 8 for _ in range(4)],
-                    [Piece("w", "p", SQUARE_SIZE) for _ in range(8)],
-                    [Piece("w", p, SQUARE_SIZE)   for p in ["r", "n", "b", "q", "k", "b", "n", "r"]],
-                    ]
+def get_starting_position():
+    return [
+            [Piece("b", p, SQUARE_SIZE)   for p in ["r", "n", "b", "q", "k", "b", "n", "r"]],
+            [Piece("b", "p", SQUARE_SIZE) for _ in range(8)],
+            *[[None] * 8 for _ in range(4)],
+            [Piece("w", "p", SQUARE_SIZE) for _ in range(8)],
+            [Piece("w", p, SQUARE_SIZE)   for p in ["r", "n", "b", "q", "k", "b", "n", "r"]],
+            ]
 
 COLOR_PALETTES = {
     "classic": {

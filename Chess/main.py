@@ -10,7 +10,7 @@ def main():
     window = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
     board = Board()
-    gamestate = GameState(palette_index=2)
+    gamestate = GameState(active_palette_index=2)
 
     while True:
         for event in pygame.event.get():
@@ -19,16 +19,19 @@ def main():
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_l:
-                    gamestate.increase_palette_index()
-                    board.mark_dirty()
+                    gamestate.next_palette()
+                    board.flag_for_redraw()
                 
                 if event.key == pygame.K_j:
-                    gamestate.decrease_palette_index()
-                    board.mark_dirty()
+                    gamestate.previous_palette()
+                    board.flag_for_redraw()
                 
                 if event.key == pygame.K_k:
-                    gamestate.toggle_contrast()
-                    board.mark_dirty()
+                    gamestate.toggle_contrast_level()
+                    board.flag_for_redraw()
+                    
+                if event.key == pygame.K_r:
+                    board.reset_board()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 gamestate.handle_click(pygame.mouse.get_pos(), board)
