@@ -1,16 +1,25 @@
 from config import COLOR_PALETTES, BOARD_ORIGIN_X, BOARD_ORIGIN_Y, SQUARE_SIZE, HIGHLIGHT_COLORS
+from game.board import Board
 
 class GameState:
     def __init__(self, active_palette_index=0, contrast_level=0):
-        self.available_palettes   = list(COLOR_PALETTES.keys())
-        self.active_palette_index   = active_palette_index
-        self.contrast_level  = contrast_level # 0 = low, 1 = high
-        self.palette_count    = len(self.available_palettes)
-        self.selected_square = None
-        self.available_moves     = []
-        self.available_captures        = []
+        self.available_palettes = list(COLOR_PALETTES.keys())
+        self.active_palette_index = active_palette_index
+        self.contrast_level = contrast_level # 0 = low, 1 = high
+        self.palette_count = len(self.available_palettes)
+        self.selected_square = None # (rank, file)
+        self.turn = 'w'
+        self.available_moves = []
+        self.available_captures = []
+        self.awaiting_promotion = None # (rank, file, color)
         self.castling_rights = {'w': {'k': True, 'q': True}, 
                                 'b': {'k': True, 'q': True}}
+        self.halfmove_clock  = 0
+        self.fullmove_number = 1
+        self.is_checkmate    = False
+        self.is_stalemate    = False
+        self.is_gameover     = False
+        self.winner          = None
         
 
     def active_colors(self):
@@ -41,18 +50,28 @@ class GameState:
         if self.selected_square:
             start = self.selected_square
             end = (row, col)
+            board.update_castling_rights(self.castling_rights)
 
             if end in self.available_moves or end in self.available_captures:
                 moving_piece = board.piece_at(*start)
                 self.update_castling_rights(start, moving_piece)
-                board.apply_move(start, end)
+                promotion_needed = board.apply_move(start, end)
+                if promotion_needed:
+                    self.awaiting_promotion = (end[0], end[1], moving_piece.color)
+                    board.flag_for_redraw()
+                    return
+
                 board.flag_for_redraw()
+                self.toggle_turn()
+
+                self.update_move_counters(moving_piece, board.piece_at(*end))
+                self.check_gameover(board)
             
             self.clear_selection()
 
-        elif clicked_piece and clicked_piece.color == board.turn:
+        elif clicked_piece and clicked_piece.color == self.turn:
             self.selected_square = (row, col)
-            self.available_moves, self.available_captures = board.legal_moves(row, col)
+            self.available_moves, self.available_captures = board.legal_moves(row, col, self.turn)
 
             if clicked_piece.type == 'k':
                 self.available_moves = self.validate_castling_moves(board, row, col, self.available_moves)
@@ -70,6 +89,8 @@ class GameState:
 
 
     def update_castling_rights(self, start, piece):
+        if piece is None:
+            return
         color = piece.color
 
         if piece.type == 'k':
@@ -89,7 +110,7 @@ class GameState:
                     self.castling_rights['b']['k'] = False
     
     def validate_castling_moves(self, board, row, col, moves):
-        color = board.turn
+        color = self.turn
         filtered_moves = []
 
         for move in moves:
@@ -118,3 +139,27 @@ class GameState:
                     if (row, col) in attacked:
                         return True
         return False
+    
+    def check_gameover(self, board):
+        if board.is_in_check(self.turn):
+            if not board.has_legal_moves(self.turn):
+                self.is_checkmate = self.is_gameover = True
+                self.winner = 'White' if self.turn == 'b' else 'Black'
+        else:
+            if not board.has_legal_moves(self.turn):
+                self.is_stalemate = self.is_gameover = True
+
+
+    def update_move_counters(self, moving_piece, captured_piece):
+        if moving_piece.type == 'p' or captured_piece:
+            self.halfmove_clock = 0
+        else:
+            self.halfmove_clock += 1
+
+        if self.turn == 'b':
+            self.fullmove_number += 1
+
+    def toggle_turn(self):
+        self.turn = 'b' if self.turn == 'w' else 'w'
+
+    

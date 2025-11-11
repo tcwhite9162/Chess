@@ -1,47 +1,27 @@
-from config import BOARD_SIZE, SQUARE_SIZE, get_starting_position
+from config import BOARD_SIZE, SQUARE_SIZE
 from game.piece import Piece
-import copy
 
 class Board:
 
     def __init__(self):
         self.king_positions = {'w': None, 'b': None}
         self.rows = self.cols = BOARD_SIZE
-        self.turn = "w"
-        self.selected = None
+        self.selected = None # (rank, file)
         self.needs_rendered = True
-        self.en_passant_target = None
-
-        self.grid = self.generate_starting_grid()
-
-    def generate_starting_grid(self):
-        board = get_starting_position() # have to use function as copy can't pickle pygame surface (?)
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                piece = board[r][c]
-                if piece and piece.type == 'k':
-                    self.king_positions[piece.color] = (r, c)
-        return board
-    
-    def reset_board(self):
-        self.king_positions = {'w': None, 'b': None}
-        self.grid = get_starting_position()
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                piece = self.grid[r][c]
-                if piece and piece.type == 'k':
-                    self.king_positions[piece.color] = (r, c)
-        self.turn = "w"
-        self.selected = None
-        self.needs_rendered = True
-        self.en_passant_target = None
+        self.en_passant_target = None # (rank, file)
+        self._castling_rights = {'w': {'k': True, 'q': True}, 
+                                'b': {'k': True, 'q': True}}
         
+    def update_castling_rights(self, rights):
+        self._castling_rights = rights
     
     def piece_at(self, row, col):
         return self.grid[row][col]
     
     def apply_move(self, starting_pos, target_pos):
         piece = self.piece_at(*starting_pos)
+        if piece is None:
+            return
 
         if piece.type == 'p' and target_pos == self.en_passant_target:
             captured_row = starting_pos[0]
@@ -72,10 +52,8 @@ class Board:
         if piece.type == 'p':
             promotion_rank = 0 if piece.color == 'w' else 7
             if target_pos[0] == promotion_rank:
-                self.promote_pawn(target_pos[0], target_pos[1], piece.color)
-
-        self.turn = "b" if self.turn == "w" else "w"
-
+                promotion_needed = True
+                return promotion_needed
 
     def flag_for_redraw(self):
         self.needs_rendered = True
@@ -102,9 +80,9 @@ class Board:
 
         return moves, captures
     
-    def legal_moves(self, row, col):
+    def legal_moves(self, row, col, turn):
         piece = self.grid[row][col]
-        if not piece or piece.color != self.turn:
+        if not piece or piece.color != turn:
             return [], []
         
         moves, captures = self.pseudo_legal_moves(row, col)
@@ -253,6 +231,9 @@ class Board:
         return moves, captures
 
     def can_castle_kingside(self, color):
+        if not self._castling_rights[color]['k']:
+            return False
+        
         row = 7 if color == 'w' else 0
         return (
             self.grid[row][5] is None and 
@@ -263,6 +244,9 @@ class Board:
         )
 
     def can_castle_queenside(self, color):
+        if not self._castling_rights[color]['q']:
+            return False
+        
         row = 7 if color == 'w' else 0
         return (
             self.grid[row][1] is None and 
@@ -334,6 +318,19 @@ class Board:
         enemy_color = 'b' if color == 'w' else 'w'
 
         return king_pos in self.squares_attacked_by_color(enemy_color)
+    
+    def has_legal_moves(self, color):
+        for row in range(self.rows):
+            for col in range(self.cols):
+                piece = self.grid[row][col]
+                if piece and piece.color == color:
+                    pseudo_moves, pseudo_captures = self.pseudo_legal_moves(row, col)
+                    if not pseudo_moves and not pseudo_captures:
+                        continue
+                    legal_moves, legal_captures = self.legal_moves(row, col, color)
+                    if legal_captures or legal_moves:
+                        return True
+        return False
     
     def check_pos(self, color):
         # used by renderer
