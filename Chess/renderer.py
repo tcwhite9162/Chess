@@ -1,11 +1,9 @@
-from config import SQUARE_SIZE, BOARD_ORIGIN_X, BOARD_ORIGIN_Y, RADIUS, CAPTURE_RING_WIDTH, CHECK_BORDER_WIDTH, FONT_SIZE, FONT_COLOR, OVERLAY_COLOR, SCREEN_HEIGHT, SCREEN_WIDTH
+from config import SQUARE_SIZE, BOARD_ORIGIN_X, BOARD_ORIGIN_Y, RADIUS, CAPTURE_RING_WIDTH, CHECK_BORDER_WIDTH, FONT_SIZE, FONT_COLOR, OVERLAY_COLOR, BOARD_SIZE, SCREEN_HEIGHT, SIDEBAR_WIDTH, CLOCK_FONT_SIZE, FONT
 from game.piece import Piece
 import pygame
 
-# light_square, dark_square, background = COLOR_PALETTES["red"]["low"]
 def render_board(window, board, gamestate):
-    light_square, dark_square, background, highlight = gamestate.active_colors()
-    window.fill(background)
+    light_square, dark_square, background, highlight = gamestate.theme.active_colors()
     legal_moves, captures = gamestate.available_moves, gamestate.available_captures
 
     for row in range(board.rows):
@@ -105,16 +103,45 @@ def render_gameover(window, board, gamestate):
     pygame.draw.rect(overlay, OVERLAY_COLOR, (0, 0, overlay_width, overlay_height), border_radius=15)
     window.blit(overlay, (overlay_x, overlay_y))
     
-    if gamestate.is_checkmate:
-        message = f"Checkmate, {gamestate.winner} Wins"
-    elif gamestate.is_stalemate:
-        message = "Stalemate, Draw"
-    else:
-        message = "Game Over ??? how"
-    
+    message = gamestate.status['reason'] or "Game over"
+
+    if gamestate.status['winner']:
+        message = message + ', ' + gamestate.status['winner'] + ' wins' 
     # Draw message 
-    font = pygame.font.SysFont("arial", FONT_SIZE)
+    font = pygame.font.SysFont(FONT, FONT_SIZE, bold=True)
     text_surface = font.render(message, True, FONT_COLOR)
     text_rect = text_surface.get_rect(center=(overlay_x + overlay_width // 2, 
                                                overlay_y + overlay_height // 2))
     window.blit(text_surface, text_rect)
+
+def render_clock(window, gamestate):
+    font = pygame.font.SysFont(FONT, CLOCK_FONT_SIZE, bold=True)
+
+    sidebar_origin_x = BOARD_ORIGIN_X + BOARD_SIZE * SQUARE_SIZE
+    clock_width = SIDEBAR_WIDTH * 0.6
+    clock_height = clock_width * 0.4
+    spacing = clock_height * 1.3 # gap between clocks
+    sidebar_center_y = SCREEN_HEIGHT // 2
+
+    for i, color in enumerate(['b', 'w']):
+        time_remaining = gamestate.clock.get_time(color)
+        minutes = int(time_remaining // 60)
+        seconds = int(time_remaining % 60)
+        time_str = f'{minutes}:{seconds:02d}'
+
+        x = sidebar_origin_x + (SIDEBAR_WIDTH - clock_width) // 2
+        y = sidebar_center_y + (i - 0.5) * spacing - clock_height // 2
+
+        background = (0, 0, 0) if color == 'b' else (255, 255, 255)
+        text_color = (0, 0, 0) if color == 'w' else (255, 255, 255)
+        outline_color = (255, 100, 100) if color == 'b' else (255, 0, 0)
+
+        if gamestate.turn == color and gamestate.clock.clock_started:
+            pygame.draw.rect(window, outline_color, (x - 4, y - 4, clock_width + 8, clock_height + 8), border_radius=10)
+        else:
+            pygame.draw.rect(window, background, (x - 4, y - 4, clock_width + 8, clock_height + 8), border_radius=10)
+        pygame.draw.rect(window, background, (x, y, clock_width, clock_height), border_radius=10)
+
+        surface = font.render(time_str, True, text_color)
+        text_rect = surface.get_rect(center=(x + clock_width // 2, y + clock_height // 2))
+        window.blit(surface, text_rect)

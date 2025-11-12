@@ -4,13 +4,14 @@ from game.piece import Piece
 class Board:
 
     def __init__(self):
-        self.king_positions = {'w': None, 'b': None}
-        self.rows = self.cols = BOARD_SIZE
-        self.selected = None # (rank, file)
-        self.needs_rendered = True
-        self.en_passant_target = None # (rank, file)
+        self.king_positions   = {'w': None, 'b': None}
         self._castling_rights = {'w': {'k': True, 'q': True}, 
                                 'b': {'k': True, 'q': True}}
+        self.en_passant_target = None # (rank, file)
+        self.selected          = None # (rank, file)
+        self.needs_rendered    = True
+        self.cols = BOARD_SIZE
+        self.rows = BOARD_SIZE 
         
     def update_castling_rights(self, rights):
         self._castling_rights = rights

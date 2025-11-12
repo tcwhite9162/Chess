@@ -1,8 +1,8 @@
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 640
+SCREEN_WIDTH = 96 * 12
+SCREEN_HEIGHT = 96 * 8
 
 BOARD_SIZE = 8
-SQUARE_SIZE = 80  # Square size
+SQUARE_SIZE = 96  # Square size
 RADIUS = 6        # Radius of legal move circles
 CAPTURE_RING_WIDTH = 8    # Thickness of ring rendered on captures
 CHECK_BORDER_WIDTH = 4    # Thickness of border around king's square when in check
@@ -10,11 +10,14 @@ CHECK_BORDER_WIDTH = 4    # Thickness of border around king's square when in che
 BOARD_ORIGIN_X = 0  # Left margin
 BOARD_ORIGIN_Y = 0  # Top margin
 
-FONT_SIZE = 24              # Font size and color for game over message
+FONT = "VictorMono"         # global font
+FONT_SIZE = 24                 # Font size and color for game over message
 FONT_COLOR = (220, 220, 230)
+CLOCK_FONT_SIZE = 32           # Font size for nums on clocks
 OVERLAY_COLOR = (0, 0, 0, 180) # Overlay color for gameover message
 
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+PIECE_SET = 'pieces-1/'
 
 SIDEBAR_WIDTH = SCREEN_WIDTH - (BOARD_SIZE * SQUARE_SIZE) - BOARD_ORIGIN_X * 2  # Remaining space
 

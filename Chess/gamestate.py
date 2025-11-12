@@ -1,43 +1,38 @@
-from config import COLOR_PALETTES, BOARD_ORIGIN_X, BOARD_ORIGIN_Y, SQUARE_SIZE, HIGHLIGHT_COLORS
-from game.board import Board
+from config import BOARD_ORIGIN_X, BOARD_ORIGIN_Y, SQUARE_SIZE
+from helpers.hash_position import encode_position
+from helpers.clock import ClockManager
+from helpers.theme import ThemeManager
+from game.history import GameHistory
 
 class GameState:
-    def __init__(self, active_palette_index=0, contrast_level=0):
-        self.available_palettes = list(COLOR_PALETTES.keys())
-        self.active_palette_index = active_palette_index
-        self.contrast_level = contrast_level # 0 = low, 1 = high
-        self.palette_count = len(self.available_palettes)
-        self.selected_square = None # (rank, file)
-        self.turn = 'w'
+    def __init__(self, active_palette_index=0, contrast_level=0, initial_time=600, increment=0):
+        self.theme   = ThemeManager(active_palette_index, contrast_level)
+        self.clock   = ClockManager(initial_time, increment)
+        self.history = GameHistory()
+        self.turn            = 'w'   
+        self.selected_square = None  # (rank, file)
         self.available_moves = []
         self.available_captures = []
         self.awaiting_promotion = None # (rank, file, color)
-        self.castling_rights = {'w': {'k': True, 'q': True}, 
-                                'b': {'k': True, 'q': True}}
+        self.castling_rights    = {'w': {'k': True, 'q': True}, 
+                                   'b': {'k': True, 'q': True}}
+        self.position_counts = {}
         self.halfmove_clock  = 0
         self.fullmove_number = 1
-        self.is_checkmate    = False
-        self.is_stalemate    = False
-        self.is_gameover     = False
-        self.winner          = None
-        
-
-    def active_colors(self):
-        palette_name = self.available_palettes[self.active_palette_index]
-        palette = COLOR_PALETTES[palette_name]
-        colors = list(palette.values())[self.contrast_level]
-        return (*colors, HIGHLIGHT_COLORS[self.active_palette_index])
-    
-    def next_palette(self):
-        self.active_palette_index = (self.active_palette_index + 1) % self.palette_count
-
-    def previous_palette(self):
-        self.active_palette_index = (self.active_palette_index - 1) % self.palette_count
-
-    def toggle_contrast_level(self):
-        self.contrast_level = 0 if self.contrast_level else 1
+        self.status = {
+            'is_checkmate': False,
+            'is_stalemate': False,
+            'is_draw': False,
+            'is_gameover': False,
+            'winner': None,
+            'reason': None
+        }
 
     def handle_click(self, position, board):
+        if not self.clock.clock_started and self.turn == 'w': # start clock on first click
+            self.clock.unpause()
+            self.clock.clock_started = True
+
         x, y = position
         col = (x - BOARD_ORIGIN_X) // SQUARE_SIZE
         row = (y - BOARD_ORIGIN_Y) // SQUARE_SIZE
@@ -52,6 +47,7 @@ class GameState:
             end = (row, col)
             board.update_castling_rights(self.castling_rights)
 
+
             if end in self.available_moves or end in self.available_captures:
                 moving_piece = board.piece_at(*start)
                 self.update_castling_rights(start, moving_piece)
@@ -63,9 +59,19 @@ class GameState:
 
                 board.flag_for_redraw()
                 self.toggle_turn()
-
                 self.update_move_counters(moving_piece, board.piece_at(*end))
-                self.check_gameover(board)
+
+                key = encode_position(board.grid, self.turn, self.castling_rights, board.en_passant_target)
+                self.position_counts[key] = self.position_counts.get(key, 0) + 1
+
+                self.save_position(board)
+                self.clock.switch_turn()
+
+                if self.check_draw(key):
+                    self.status['is_draw']     = True
+                    self.status['is_gameover'] = True
+                else:
+                    self.check_gameover(board)
             
             self.clear_selection()
 
@@ -141,14 +147,32 @@ class GameState:
         return False
     
     def check_gameover(self, board):
+        for color in ['w', 'b']:
+            if self.clock.is_flagged(color):
+                self.set_gameover('Time expired', winner='White' if color == 'b' else 'Black')
+
         if board.is_in_check(self.turn):
             if not board.has_legal_moves(self.turn):
-                self.is_checkmate = self.is_gameover = True
-                self.winner = 'White' if self.turn == 'b' else 'Black'
+                self.set_gameover('Checkmate', checkmate=True, winner='White' if self.turn == 'b' else 'Black')
         else:
             if not board.has_legal_moves(self.turn):
-                self.is_stalemate = self.is_gameover = True
+                self.set_gameover('Stalemate', stalemate=True)
 
+                
+        return None
+    
+    def check_draw(self, key):
+
+        if self.position_counts[key] >= 3:
+            self.set_gameover('Threefold repetition', draw=True)
+            self.status['reason'] = "Threefold repetition"
+            return True
+        
+        if self.halfmove_clock >= 50:
+            self.set_gameover('50 move rule', draw=True)
+            return True
+        
+        return False
 
     def update_move_counters(self, moving_piece, captured_piece):
         if moving_piece.type == 'p' or captured_piece:
@@ -162,4 +186,30 @@ class GameState:
     def toggle_turn(self):
         self.turn = 'b' if self.turn == 'w' else 'w'
 
+    def save_position(self, board):
+        self.history.save_position(board, self)
+    def restore_position(self, board, index):
+        self.history.restore_position(board, self, index)
+    def step_forward(self, board):
+        self.history.step_forward(self, board)
+    def step_backward(self, board):
+        self.history.step_backward(self, board)
+    def jump_to_start(self, board):
+        self.history.jump_to_start(self, board)
+    def jump_to_end(self, board):
+        self.history.jump_to_end(self, board)
     
+    def set_gameover(self, reason, winner=None, checkmate=False, stalemate=False, draw=False):
+        self.status.update({
+            'is_gameover': True,
+            'is_checkmate': checkmate,
+            'is_stalemate': stalemate,
+            'is_draw': draw,
+            'winner': winner,
+            'reason': reason
+        })
+        self.clock.pause()
+
+    def reset_status(self):
+        for key in self.status:
+            self.status[key] = False if isinstance(self.status[key], bool) else None
