@@ -6,8 +6,8 @@ from gamestate import GameState
 from game.board import Board
 import pygame
 import sys
-# ??
-# hello?
+#?
+
 def main():
     pygame.init()
     pygame.font.init()
