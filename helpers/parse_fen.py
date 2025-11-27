@@ -39,7 +39,7 @@ def parse_fen(fen_string: str, square_size: int):
         en_passant_square = None
     else:
         file = ord(en_passant_string[0]) - ord('a')
-        rank = 8 - int(ord(en_passant_string[1]))
+        rank = 8 - int(en_passant_string[1])
         en_passant_square = (rank, file)
     
     halfmove_num = int(halfmove_string)
@@ -54,3 +54,4 @@ def parse_fen(fen_string: str, square_size: int):
 
     
     return grid
+    

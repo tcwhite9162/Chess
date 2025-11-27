@@ -1,4 +1,4 @@
-from config import PIECE_SET
+import config as cfg
 import cairosvg
 import pygame
 import io
@@ -10,7 +10,7 @@ class Piece:
         self.type  = type_str
         self.code  = f"{color}{type_str}"
         if self.code not in _images_cache:
-            svg_path = f"assets/{PIECE_SET}{self.code}.svg"
+            svg_path = f"assets/{cfg.PIECE_SET}{self.code}.svg"
             png_bytes = cairosvg.svg2png(url=svg_path, output_width=square_size, output_height=square_size)
             image_stream = io.BytesIO(png_bytes)
             image = pygame.image.load(image_stream).convert_alpha()

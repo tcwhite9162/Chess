@@ -16,7 +16,8 @@ FONT_COLOR = (220, 220, 230)
 CLOCK_FONT_SIZE = 32           # Font size for nums on clocks
 OVERLAY_COLOR = (0, 0, 0, 180) # Overlay color for gameover message
 
-START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+START_FEN   = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+EP_TEST_FEN = "8/2p5/8/K2Pr3/8/8/8/8 b - c6 0 1"
 PIECE_SET = 'pieces-1/'
 
 SIDEBAR_WIDTH = SCREEN_WIDTH - (BOARD_SIZE * SQUARE_SIZE) - BOARD_ORIGIN_X * 2  # Remaining space

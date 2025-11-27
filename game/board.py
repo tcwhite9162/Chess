@@ -1,5 +1,5 @@
-from config import BOARD_SIZE, SQUARE_SIZE
 from game.piece import Piece
+import config as cfg
 
 class Board:
 
@@ -10,8 +10,9 @@ class Board:
         self.en_passant_target = None # (rank, file)
         self.selected          = None # (rank, file)
         self.needs_rendered    = True
-        self.cols = BOARD_SIZE
-        self.rows = BOARD_SIZE 
+        self.cols = cfg.BOARD_SIZE
+        self.rows = cfg.BOARD_SIZE
+        self.grid = []
         
     def update_castling_rights(self, rights):
         self._castling_rights = rights
@@ -96,12 +97,23 @@ class Board:
             initial_king_pos = self.king_positions[piece.color]
             initial_piece = self.grid[row][col]
 
+            # dumbass stupid ass stinky ass en passant case
+            en_passant_captured = None
+            if piece.type == 'p' and target == self.en_passant_target and captured is None:
+                captured_pawn_row = row
+                captured_pawn_col = target[1]
+                en_passant_captured = self.grid[captured_pawn_row][captured_pawn_col]
+                self.grid[captured_pawn_row][captured_pawn_col] = None
+
+        
             # make move on board
             self.grid[target[0]][target[1]] = piece
             self.grid[row][col] = None
 
+
             if piece.type == 'k':
                 self.king_positions[piece.color] = target
+
             # check if move results in check
             in_check = self.is_in_check(piece.color)
 
@@ -110,6 +122,11 @@ class Board:
             self.grid[target[0]][target[1]] = captured
             self.king_positions[piece.color] = initial_king_pos
 
+            # check whether to restore en passant
+            if en_passant_captured:
+                captured_pawn_row = row
+                captured_pawn_col = target[1]
+                self.grid[captured_pawn_row][captured_pawn_col] = en_passant_captured
 
             if not in_check:
                 if target in moves:
@@ -338,7 +355,7 @@ class Board:
         return self.king_positions[color] if self.is_in_check(color) else None
     
     def promote_pawn(self, row, col, color, new_type='q'):
-        self.grid[row][col] = Piece(color, new_type, SQUARE_SIZE)
+        self.grid[row][col] = Piece(color, new_type, cfg.SQUARE_SIZE)
 
     def __repr__(self):
         rows = []

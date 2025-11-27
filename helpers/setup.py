@@ -1,3 +1,4 @@
+from typing import Optional
 from helpers.parse_fen import parse_fen
 
 def setup_from_fen(fen: str, board, gamestate, square_size):
@@ -15,10 +16,11 @@ def setup_from_fen(fen: str, board, gamestate, square_size):
 
 
 def find_kings(grid):
-    positions = {'w': None, 'b': None}
+    positions: dict[str, Optional[tuple[int, int]]] = {'w': None, 'b': None}
     for r in range(8):
         for c in range(8):
             piece = grid[r][c]
             if piece and piece.type == 'k':
                 positions[piece.color] = (r, c)
     return positions
+##

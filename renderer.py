@@ -49,7 +49,7 @@ def render_board(window, board, gamestate):
                 render_piece(window, board, row, col)
 
     if gamestate.awaiting_promotion:
-        row, col, color = gamestate.awaiting_promotion
+        row, col, color, _ = gamestate.awaiting_promotion
         render_promotion_choices(window, row, col, color)
 
 
@@ -92,7 +92,6 @@ def render_captures(window, captures, color):
 
 def render_promotion_choices(window, row, col, color):
     square_color = (50, 50, 50) if color == "w" else (220, 220, 220)
-    print("Rendering promotion")
     choices = ["q", "r", "n", "b"]
     for i, piece_type in enumerate(choices):
         x = BOARD_ORIGIN_X + col * SQUARE_SIZE

@@ -1,8 +1,8 @@
-from config import BOARD_ORIGIN_X, BOARD_ORIGIN_Y, SQUARE_SIZE
 from helpers.hash_position import encode_position
 from helpers.clock import ClockManager
 from helpers.theme import ThemeManager
 from game.history import GameHistory
+import config as cfg
 
 class GameState:
     def __init__(self, active_palette_index=0, contrast_level=0, initial_time=600, increment=0):
@@ -29,13 +29,14 @@ class GameState:
         }
 
     def handle_click(self, position, board):
+        print(self.fullmove_number, self.halfmove_clock)
         if not self.clock.clock_started and self.turn == 'w': # start clock on first click
             self.clock.unpause()
             self.clock.clock_started = True
 
         x, y = position
-        col = (x - BOARD_ORIGIN_X) // SQUARE_SIZE
-        row = (y - BOARD_ORIGIN_Y) // SQUARE_SIZE
+        col = (x - cfg.BOARD_ORIGIN_X) // cfg.SQUARE_SIZE
+        row = (y - cfg.BOARD_ORIGIN_Y) // cfg.SQUARE_SIZE
 
         if not (0 <= row < 8 and 0 <= col < 8):
             return # Clicked outside board
@@ -50,16 +51,24 @@ class GameState:
 
             if end in self.available_moves or end in self.available_captures:
                 moving_piece = board.piece_at(*start)
+                captured_piece = board.piece_at(*end)
+
                 self.update_castling_rights(start, moving_piece)
+                
+                if captured_piece and captured_piece.type == 'r':
+                    self.update_castling_rights(end, captured_piece)
+
                 promotion_needed = board.apply_move(start, end)
+
                 if promotion_needed:
-                    self.awaiting_promotion = (end[0], end[1], moving_piece.color)
+                    self.awaiting_promotion = (end[0], end[1], moving_piece.color, captured_piece)
                     board.flag_for_redraw()
+
                     return
 
+                self.update_move_counters(moving_piece, captured_piece)
                 board.flag_for_redraw()
                 self.toggle_turn()
-                self.update_move_counters(moving_piece, board.piece_at(*end))
 
                 key = encode_position(board.grid, self.turn, self.castling_rights, board.en_passant_target)
                 self.position_counts[key] = self.position_counts.get(key, 0) + 1
@@ -87,6 +96,36 @@ class GameState:
 
 
         board.flag_for_redraw()
+
+    def complete_promotion(self, board, piece_type):
+        if not self.awaiting_promotion:
+            return
+
+        row, col, color, captured_piece = self.awaiting_promotion
+        board.promote_pawn(row, col, color, piece_type)
+
+        moving_piece = board.piece_at(row, col)
+
+        self.update_move_counters(moving_piece, captured_piece)
+        self.toggle_turn()
+
+        key = encode_position(board.grid, self.turn, self.castling_rights, board.en_passant_target)
+        self.position_counts[key] = self.position_counts.get(key, 0) + 1
+
+        self.save_position(board)
+        self.clock.switch_turn()
+
+        if self.check_draw(key):
+            self.status['is_draw'] = True
+            self.status['is_gameover'] = True
+        else:
+            self.check_gameover(board)
+
+        self.awaiting_promotion = None
+        self.clear_selection()
+        board.flag_for_redraw()
+
+
 
     def clear_selection(self):
         self.selected_square = None
