@@ -1,0 +1,74 @@
+
+EMPTY = 0
+W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING = 1, 2, 3, 4, 5, 6
+B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING = -1, -2, -3, -4, -5, -6
+
+# index deltas for moving one square orthogonally
+UP = -8   # up rank
+DOWN = 8  # down rank
+LEFT = -1 # left file
+RIGHT = 1 # right file
+
+# diagonal moves
+UP_LEFT = -9
+UP_RIGHT = -7
+DOWN_LEFT = 7
+DOWN_RIGHT = 9
+
+# piece moves directions
+ROOK_DIRS = [-8, 8, -1, 1]
+BISHOP_DIRS = [-9, -7, 7, 9]
+QUEEN_DIRS = KING_DIRS = ROOK_DIRS + BISHOP_DIRS
+
+KNIGHT_DIRS = [-17, -15, -10, -6, 6, 10, 15, 17]
+
+# move flags 
+NORMAL_MOVE              = 0b0000
+EN_PASSANT               = 0b0001
+CASTLING                 = 0b0010
+CAPTURE                  = 0b0100
+
+PROMOTION_QUEEN          = 0b1000
+PROMOTION_ROOK           = 0b1001
+PROMOTION_BISHOP         = 0b1010
+PROMOTION_KNIGHT         = 0b1011
+
+PROMOTION_QUEEN_CAPTURE  = 0b1100
+PROMOTION_ROOK_CAPTURE   = 0b1101
+PROMOTION_BISHOP_CAPTURE = 0b1110
+PROMOTION_KNIGHT_CAPTURE = 0b1111
+
+# Board indices
+WHITE_KING_START = 60
+BLACK_KING_START = 4
+
+WHITE_KINGSIDE_CASTLE = 62
+WHITE_QUEENSIDE_CASTLE = 58
+BLACK_KINGSIDE_CASTLE = 6
+BLACK_QUEENSIDE_CASTLE = 2
+
+# Squares passed through during castling
+WHITE_KINGSIDE_PATH = [61, 62]   # f1, g1
+WHITE_QUEENSIDE_PATH = [59, 58, 57] # d1, c1, b1
+BLACK_KINGSIDE_PATH = [5, 6]     # f8, g8
+BLACK_QUEENSIDE_PATH = [3, 2, 1] # d8, c8, b8
+
+WHITE_ROOK_H1 = 63
+WHITE_ROOK_A1 = 56
+WHITE_ROOK_F1 = 61
+WHITE_ROOK_D1 = 59
+
+BLACK_ROOK_H8 = 7
+BLACK_ROOK_A8 = 0
+BLACK_ROOK_F8 = 5
+BLACK_ROOK_D8 = 3
+
+# Pawn ranks
+WHITE_PAWN_START_RANK = 6
+BLACK_PAWN_START_RANK = 1
+WHITE_PROMOTION_RANK = 0   # squares 0–7 (a8 - h8)
+BLACK_PROMOTION_RANK = 7   # squares 56–63 (a1 - h1)
+
+# Pawn rows
+BLACK_PAWN_ROW = range(8, 16)
+WHITE_PAWN_ROW = range(48, 56)
