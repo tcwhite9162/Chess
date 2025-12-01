@@ -1,0 +1,28 @@
+import constants as C
+
+PAWN_PST   = [0]*64
+KNIGHT_PST = [0]*64
+BISHOP_PST = [0]*64
+ROOK_PST   = [0]*64
+QUEEN_PST  = [0]*64
+KING_PST   = [0]*64
+
+PIECE_VALUES = {
+    C.PAWN:   100,
+    C.KNIGHT: 320,
+    C.BISHOP: 330,
+    C.ROOK:   500,
+    C.QUEEN:  900,
+    C.KING:   20_000,
+}
+
+PST_MAP = {
+    C.PAWN:   PAWN_PST,
+    C.KNIGHT: KNIGHT_PST,
+    C.BISHOP: BISHOP_PST,
+    C.ROOK:   ROOK_PST,
+    C.QUEEN:  QUEEN_PST,
+    C.KING:   KING_PST,
+}
+MOBILITY_FACTOR = 10
+PAWN_PENALTY    = 25

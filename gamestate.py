@@ -29,7 +29,6 @@ class GameState:
         }
 
     def handle_click(self, position, board):
-        print(self.fullmove_number, self.halfmove_clock)
         if not self.clock.clock_started and self.turn == 'w': # start clock on first click
             self.clock.unpause()
             self.clock.clock_started = True

@@ -1,5 +1,5 @@
+from collections import Counter
 import constants as C
-from move import Move
 import MoveGen
 
 class Board:
@@ -7,7 +7,7 @@ class Board:
         self.squares = [0] * 64
 
         self.turn = 1           # -1 for black
-        self.castling = 0b1111  # as KQkq 
+        self.castling = C.CASTLE_ALL
         self.en_passant = -1
         self.halfmove = 0
         self.fullmove = 1
@@ -17,14 +17,18 @@ class Board:
 
         self.history = []
 
+        self.repetitions = Counter()
+        self.zobrist_key = self.compute_zobrist()
+        self.repetitions[self.zobrist_key] += 1
+
     def generate_legal_moves(self):
         legal_moves = []
         
         for move in self.generate_pseudo_legal_moves():
-            self.make_move(move)
+            self.make_move(move, update_hash=False)
             if not self.is_in_check(-self.turn):
                 legal_moves.append(move)
-            self.unmake_move()
+            self.unmake_move(update_hash=False)
         
         return legal_moves
 
@@ -52,7 +56,21 @@ class Board:
 
         return moves
 
-    def make_move(self, move):
+    def compute_zobrist(self):
+        key = 0
+        for square, piece in enumerate(self.squares):
+            if piece != C.EMPTY:
+                key ^= C.ZOBRIST_PIECE[piece][square]
+        
+        key ^= C.ZOBRIST_CASTLING[self.castling]
+        if self.en_passant != -1 and self.enpassant_available():
+            key ^= C.ZOBRIST_ENPASSANT[self.en_passant % 8] # only use file on ep square
+        if self.turn == -1:
+            key ^= C.ZOBRIST_TURN
+
+        return key
+
+    def make_move(self, move, update_hash=True):
         from_sq =  move & 0x3F
         to_sq   = (move >> 6) & 0x3F
         flags   = (move >> 12) & 0xF
@@ -79,6 +97,7 @@ class Board:
             self.squares[captured_sq] = C.EMPTY
             self.squares[to_sq] = piece
 
+
         # promotion
         if flags in (C.PROMOTION_QUEEN, C.PROMOTION_QUEEN_CAPTURE):
             self.squares[to_sq] = C.W_QUEEN if self.turn == 1 else C.B_QUEEN
@@ -101,7 +120,7 @@ class Board:
 
         if flags == C.CASTLING:
             if piece == C.W_KING:
-                if to_sq == C.WHITE_KINGSIDE_CASTLE: # white castling kingside
+                if to_sq == C.WHITE_KINGSIDE_CASTLE:     # white castling kingside
                     self.squares[C.WHITE_ROOK_H1] = C.EMPTY
                     self.squares[C.WHITE_ROOK_F1] = C.W_ROOK
                 elif to_sq == C.WHITE_QUEENSIDE_CASTLE: # white castling queenside
@@ -109,10 +128,10 @@ class Board:
                     self.squares[C.WHITE_ROOK_D1] = C.W_ROOK
             
                 self.white_king_pos = to_sq
-                self.castling &= 0b1100 # clear white castling rights
+                self.castling &= ~(C.CASTLE_WK | C.CASTLE_WQ) # clear white castling rights
             
             elif piece == C.B_KING:
-                if to_sq == C.BLACK_KINGSIDE_CASTLE: # black castling kingside
+                if to_sq == C.BLACK_KINGSIDE_CASTLE:    # black castling kingside
                     self.squares[C.BLACK_ROOK_H8] = C.EMPTY
                     self.squares[C.BLACK_ROOK_F8] = C.B_ROOK
                 elif to_sq == C.BLACK_QUEENSIDE_CASTLE: # black castling queenside
@@ -120,7 +139,7 @@ class Board:
                     self.squares[C.BLACK_ROOK_D8] = C.B_ROOK
                 
                 self.black_king_pos = to_sq
-                self.castling &= 0b0011
+                self.castling &= ~(C.CASTLE_BK | C.CASTLE_BQ) # clear black castling rights
         
         # halfmove clock update
         if abs(piece) == 1 or flags & C.CAPTURE:
@@ -136,7 +155,11 @@ class Board:
         if self.turn == 1:
             self.fullmove += 1
         
-    def unmake_move(self):
+        if update_hash:
+            self.zobrist_key = self.compute_zobrist()
+            self.repetitions[self.zobrist_key] += 1
+
+    def unmake_move(self, update_hash=True):
         # undo most recent move
         state = self.history.pop()
         move = state['move']
@@ -206,11 +229,38 @@ class Board:
         if self.turn == -1:
             self.fullmove -= 1
 
-   
+        if update_hash:
+            self.zobrist_key = self.compute_zobrist()
+            self.repetitions[self.zobrist_key] -= 1
+
+    def enpassant_available(self):
+        if self.en_passant == -1:
+            return False
+
+        ep_rank = self.en_passant // 8
+        ep_file = self.en_passant  % 8
+
+        if self.turn == 1:
+            for df in (1, -1):
+                adj_file = ep_file + df
+                if 0 <= adj_file < 8:
+                    square = (ep_rank + 1) * 8 + adj_file
+                    if self.squares[square] == C.W_PAWN:
+                        return True
+
+        else:
+            for df in (1, -1):
+                adj_file = ep_file + df
+                if 0 <= adj_file < 8:
+                    square = (ep_rank - 1) * 8 + adj_file
+                    if self.squares[square] == C.B_PAWN:
+                        return True
+
+        return False
+
     def is_in_check(self, color):
         king_pos = self.white_king_pos if color == 1 else self.black_king_pos
         return self._is_square_attacked(king_pos, -color)
-    
 
     def piece_at(self, square):
         return self.squares[square]
@@ -226,6 +276,25 @@ class Board:
     
     def is_stalemate(self):
         return not self.is_in_check(self.turn) and not self.has_legal_moves()
+
+    def is_threefold_repetition(self):
+        return self.repetitions[self.zobrist_key] >= 3
+
+    def is_draw(self):
+        return (
+            self.is_threefold_repetition() or
+            self.is_stalemate() or
+            self.halfmove >= 100 or
+            self.is_insufficient_material()
+        )
+
+    def count_pseudo_moves_for_side(self, side):
+        old = self.turn
+        self.turn = side
+        try:
+            return len(self.generate_pseudo_legal_moves())
+        finally:
+            self.turn = old
 
     def setup_starting_position(self):
         # standard starting position
@@ -247,32 +316,36 @@ class Board:
         for j in C.WHITE_PAWN_ROW:
             self.squares[j] = C.W_PAWN
 
+        self.castling = C.CASTLE_ALL
+        self.zobrist_key = self.compute_zobrist()
+        self.repetitions[self.zobrist_key] += 1
+
     def _update_castling_rights(self, from_sq, to_sq, piece, captured):
         # clear castling if king moves
         if piece == C.W_KING:
-            self.castling &= 0b1100
+            self.castling &= ~(C.CASTLE_WK | C.CASTLE_WQ)
             self.white_king_pos = to_sq
         elif piece == C.B_KING:
-            self.castling &= 0b0011
+            self.castling &= ~(C.CASTLE_BK | C.CASTLE_BQ)
             self.black_king_pos = to_sq
 
         # if rook moves
-        if from_sq == C.WHITE_ROOK_H1:               # white rook h1
-            self.castling &= 0b1110
-        elif from_sq == C.WHITE_ROOK_A1:             # white rook a1
-            self.castling &= 0b1101
-        elif from_sq == C.BLACK_ROOK_H8:              # black rook h8
-            self.castling &= 0b1011
-        elif from_sq == C.BLACK_ROOK_A8:              # black rook a8
-            self.castling &= 0b0111
+        if from_sq == C.WHITE_ROOK_H1:      # white rook h1
+            self.castling &= ~C.CASTLE_WK
+        elif from_sq == C.WHITE_ROOK_A1:    # white rook a1
+            self.castling &= ~C.CASTLE_WQ
+        elif from_sq == C.BLACK_ROOK_H8:    # black rook h8
+            self.castling &= ~C.CASTLE_BK
+        elif from_sq == C.BLACK_ROOK_A8:    # black rook a8
+            self.castling &= ~C.CASTLE_BQ
 
         # if rook captured
         if captured == C.W_ROOK:
-            if to_sq == C.WHITE_ROOK_H1: self.castling &= 0b1110
-            if to_sq == C.WHITE_ROOK_A1: self.castling &= 0b1101
+            if to_sq == C.WHITE_ROOK_H1: self.castling &= ~C.CASTLE_WK
+            if to_sq == C.WHITE_ROOK_A1: self.castling &= ~C.CASTLE_WQ
         elif captured == C.B_ROOK:
-            if to_sq == C.BLACK_ROOK_H8: self.castling &= 0b1011
-            if to_sq == C.BLACK_ROOK_A8: self.castling &= 0b0111
+            if to_sq == C.BLACK_ROOK_H8: self.castling &= ~C.CASTLE_BK
+            if to_sq == C.BLACK_ROOK_A8: self.castling &= ~C.CASTLE_BQ
 
     def _is_square_attacked(self, square, attacking_color):
         sq_rank = square // 8
@@ -361,6 +434,29 @@ class Board:
                 if attacking_color == 1 and piece == C.W_KING:
                     return True
                 if attacking_color == -1 and piece == C.B_KING:
+                    return True
+
+        return False
+
+    def is_insufficient_material(self):
+        pieces = [p for p in self.squares if p != C.EMPTY]
+
+        # King vs King
+        if all(abs(p) == C.KING for p in pieces):
+            return True
+
+        # King + minor piece vs King
+        if len(pieces) == 3:
+            non_king = [p for p in pieces if abs(p) != C.KING][0]
+            if abs(non_king) in (C.KNIGHT, C.BISHOP):
+                return True
+
+        # King + bishop vs King + bishop (same color bishops)
+        if len(pieces) == 4:
+            bishops = [(i, p) for i, p in enumerate(self.squares) if abs(p) == C.BISHOP]
+            if len(bishops) == 2 and bishops[0][1] * bishops[1][1] < 0:
+                colors = [(sq // 8 + sq % 8) % 2 for sq, _ in bishops]
+                if colors[0] == colors[1]:
                     return True
 
         return False

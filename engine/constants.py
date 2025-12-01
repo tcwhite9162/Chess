@@ -1,7 +1,12 @@
+import zobrist as Z
 
 EMPTY = 0
+PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING = 1, 2, 3, 4, 5, 6
 B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING = -1, -2, -3, -4, -5, -6
+
+# Square indexing starts in top left and goes in reading order
+# eg: 0 = a8, 1 = b8 ... 63 = h1
 
 # index deltas for moving one square orthogonally
 UP = -8   # up rank
@@ -16,8 +21,8 @@ DOWN_LEFT = 7
 DOWN_RIGHT = 9
 
 # piece moves directions
-ROOK_DIRS = [-8, 8, -1, 1]
-BISHOP_DIRS = [-9, -7, 7, 9]
+ROOK_DIRS = (-8, 8, -1, 1)
+BISHOP_DIRS = (-9, -7, 7, 9)
 QUEEN_DIRS = KING_DIRS = ROOK_DIRS + BISHOP_DIRS
 
 KNIGHT_DIRS = [-17, -15, -10, -6, 6, 10, 15, 17]
@@ -37,6 +42,14 @@ PROMOTION_QUEEN_CAPTURE  = 0b1100
 PROMOTION_ROOK_CAPTURE   = 0b1101
 PROMOTION_BISHOP_CAPTURE = 0b1110
 PROMOTION_KNIGHT_CAPTURE = 0b1111
+
+# castling masks
+CASTLE_WK = 0b0001  # white kingside (K)
+CASTLE_WQ = 0b0010  # white queenside (Q)
+CASTLE_BK = 0b0100  # black kingside (k)
+CASTLE_BQ = 0b1000  # black queenside (q)
+CASTLE_ALL = CASTLE_WK | CASTLE_WQ | CASTLE_BK | CASTLE_BQ  # 0b1111
+
 
 # Board indices
 WHITE_KING_START = 60
@@ -72,3 +85,10 @@ BLACK_PROMOTION_RANK = 7   # squares 56–63 (a1 - h1)
 # Pawn rows
 BLACK_PAWN_ROW = range(8, 16)
 WHITE_PAWN_ROW = range(48, 56)
+
+# zobrist tables - seeded 123
+
+ZOBRIST_CASTLING = Z.castling
+ZOBRIST_ENPASSANT = Z.en_passant
+ZOBRIST_TURN = Z.turn
+ZOBRIST_PIECE = Z.piece

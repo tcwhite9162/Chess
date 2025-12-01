@@ -1,6 +1,7 @@
 
 import pytest
-from EngineBoard import Board, Move
+from EngineBoard import Board
+from move import Move
 from constants import *
 
 def square_to_coord(square):
@@ -549,3 +550,134 @@ def test_knight_attack_detection():
             f"Knight should not attack {square_to_coord(sq)}"
 
 
+
+# --- Helpers ---
+def empty_board():
+    b = Board()
+    b.squares = [EMPTY] * 64
+    b.white_king_pos = WHITE_KING_START
+    b.black_king_pos = BLACK_KING_START
+    b.squares[b.white_king_pos] = W_KING
+    b.squares[b.black_king_pos] = B_KING
+    b.zobrist_key = b.compute_zobrist()
+    return b
+
+# --- Tests for enpassant_available ---
+def testenpassant_available_white_pawn():
+    b = empty_board()
+    # Place white pawn at e5 (square 36), black pawn at d7 (square 11)
+    b.squares[28] = W_PAWN
+    b.squares[27] = B_PAWN
+    b.en_passant = 19  # c6 square index (from_sq+to_sq)//2 for a double pawn push)
+    b.turn = 1  # White to move
+    assert b.enpassant_available() is True
+
+def testenpassant_not_available_no_adjacent_pawn():
+    b = empty_board()
+    b.squares[40] = W_PAWN
+    b.en_passant = 48
+    b.turn = 1
+    assert b.enpassant_available() is False
+
+# --- Tests for is_insufficient_material ---
+def test_only_kings_draw():
+    b = empty_board()
+    b.squares[4] = B_KING
+    b.squares[60] = W_KING
+    assert b.is_insufficient_material() is True
+
+def test_king_and_bishop_vs_king_draw():
+    b = empty_board()
+    b.squares[4] = B_KING
+    b.squares[60] = W_KING
+    b.squares[2] = W_BISHOP
+    assert b.is_insufficient_material() is True
+
+def test_king_and_two_bishops_not_draw():
+    b = empty_board()
+    b.squares[4] = B_KING
+    b.squares[60] = W_KING
+    b.squares[2] = W_BISHOP
+    b.squares[5] = W_BISHOP
+    assert b.is_insufficient_material() is False
+
+# --- Tests for is_threefold_repetition ---
+def test_threefold_repetition_detected():
+    b = Board()
+    key = b.zobrist_key
+    b.repetitions[key] = 3
+    assert b.is_threefold_repetition() is True
+
+def test_threefold_repetition_not_detected():
+    b = Board()
+    key = b.zobrist_key
+    b.repetitions[key] = 2
+    assert b.is_threefold_repetition() is False
+
+# --- Tests for is_draw ---
+def test_draw_by_stalemate(monkeypatch):
+    b = empty_board()
+    b.squares[4] = B_KING
+    b.squares[60] = W_KING
+    # Force has_legal_moves to return False, is_in_check to return False
+    monkeypatch.setattr(b, "has_legal_moves", lambda: False)
+    monkeypatch.setattr(b, "is_in_check", lambda color: False)
+    assert b.is_draw() is True
+
+def test_draw_by_fifty_move_rule():
+    b = Board()
+    b.halfmove = 100
+    assert b.is_draw() is True
+
+def test_draw_by_insufficient_material():
+    b = empty_board()
+    b.squares[4] = B_KING
+    b.squares[60] = W_KING
+    assert b.is_draw() is True
+
+# --- Tests for hashing ---
+def test_zobrist_changes_on_move():
+    b = Board()
+    b.setup_starting_position()
+    initial_key = b.zobrist_key
+    move = (12) | (28 << 6)  # black pawn from e7 (12) to e5 (28)
+    b.make_move(move)
+    assert b.zobrist_key != initial_key
+
+def test_zobrist_restored_on_unmake():
+    b = Board()
+    b.setup_starting_position()
+    initial_key = b.zobrist_key
+    move = (12) | (28 << 6)  # black pawn from e7 to e5
+    b.make_move(move)
+    b.unmake_move()
+    assert b.zobrist_key == initial_key
+
+def test_zobristenpassant_file_bit_on_double_push():
+    b = Board()
+    b.setup_starting_position()
+
+    # Prepare board for the scenario
+    b.turn = -1
+    b.squares[28] = W_PAWN  # e5, adjacent to EP target
+    b.zobrist_key = b.compute_zobrist()   # recompute now that we've mutated the board
+    base = b.zobrist_key
+
+    from_sq, to_sq = 11, 27
+    move = from_sq | (to_sq << 6)
+
+    # preconditions
+    assert b.squares[from_sq] == B_PAWN
+    assert b.squares[to_sq] == EMPTY
+    assert abs(to_sq - from_sq) == 16
+
+    b.make_move(move)
+
+    assert b.en_passant == (from_sq + to_sq) // 2
+    assert b.enpassant_available() is True
+    assert b.zobrist_key != base
+
+    b.unmake_move()
+    # recompute and compare to the base that included the adjacent pawn
+    b.zobrist_key = b.compute_zobrist()
+    assert b.zobrist_key == base

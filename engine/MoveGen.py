@@ -1,10 +1,6 @@
 from move import Move
 import constants as C
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from EngineBoard import Board
-
 def generate_pawn_moves(board, square):
     moves = []
     rank = square // 8
@@ -51,7 +47,7 @@ def generate_pawn_moves(board, square):
             else:
                 moves.append(Move.encode_move(square, capture_square, C.CAPTURE))
 
-        elif capture_square == board.en_passant:
+        elif capture_square == board.en_passant and board.enpassant_available():
             moves.append(Move.encode_move(square, capture_square, C.EN_PASSANT))
     
     return moves
@@ -76,8 +72,10 @@ def generate_knight_moves(board, square):
             continue
         
         target_piece = board.squares[new_square]
-        if target_piece == C.EMPTY or target_piece * board.turn < 0:
+        if target_piece == C.EMPTY:
             moves.append(Move.encode_move(square, new_square))
+        elif target_piece * board.turn < 0:
+            moves.append(Move.encode_move(square, new_square, C.CAPTURE))
 
     return moves
 
@@ -98,9 +96,10 @@ def generate_sliding_moves(board, square):
     }
     moves = []
 
-    file = square %  8        
-    type = abs(board.squares[square])
-    directions = type_dirs[type]
+    piece_type = abs(board.squares[square])
+    directions = type_dirs.get(piece_type)
+    if directions is None:
+        return []
 
     for direction in directions:
         current = square + direction
@@ -108,12 +107,11 @@ def generate_sliding_moves(board, square):
         while 0 <= current < 64:
             current_file = current %  8
 
-            if abs(direction) == 1 or abs(direction) == 9 or abs(direction) == 7: # left / right moves
-                if current_file == 0 and direction in [C.RIGHT, C.UP_RIGHT, C.DOWN_RIGHT]:
-                    break
-                if current_file == 7 and direction in [C.LEFT, C.UP_LEFT, C.DOWN_LEFT]:
-                    break
-                    
+
+            prev = current - direction
+            if abs((current % 8) - (prev % 8)) != 1 and direction in (C.LEFT, C.RIGHT, C.UP_LEFT, C.UP_RIGHT, C.DOWN_LEFT, C.DOWN_RIGHT):
+                break
+
             target = board.squares[current]
 
             if target == C.EMPTY: # square is empty
@@ -153,7 +151,7 @@ def generate_king_moves(board, square):
     # castling moves
     if board.turn == 1: # white
         # kingside 
-        if (board.white_king_pos == C.WHITE_KING_START and (board.castling & 0b0001) and
+        if (board.white_king_pos == C.WHITE_KING_START and (board.castling & C.CASTLE_WK) and
             not board.is_in_check(1) and
             all(board.squares[sq] == C.EMPTY for sq in C.WHITE_KINGSIDE_PATH) and
             all(not board._is_square_attacked(sq, -1) for sq in [C.WHITE_KING_START] + C.WHITE_KINGSIDE_PATH) and
@@ -161,7 +159,7 @@ def generate_king_moves(board, square):
             moves.append(Move.encode_move(C.WHITE_KING_START, C.WHITE_KINGSIDE_CASTLE, C.CASTLING))
         
         # queenside
-        if (board.white_king_pos == C.WHITE_KING_START and (board.castling & 0b0010) and
+        if (board.white_king_pos == C.WHITE_KING_START and (board.castling & C.CASTLE_WQ) and
             not board.is_in_check(1) and
             all(board.squares[sq] == C.EMPTY for sq in C.WHITE_QUEENSIDE_PATH) and
             all(not board._is_square_attacked(sq, -1) for sq in [C.WHITE_KING_START] + C.WHITE_QUEENSIDE_PATH) and
@@ -169,7 +167,7 @@ def generate_king_moves(board, square):
             moves.append(Move.encode_move(C.WHITE_KING_START, C.WHITE_QUEENSIDE_CASTLE, C.CASTLING))
 
     else: # black
-        if (board.black_king_pos == C.BLACK_KING_START and (board.castling & 0b0100) and
+        if (board.black_king_pos == C.BLACK_KING_START and (board.castling & C.CASTLE_BK) and
             not board.is_in_check(-1) and
             all(board.squares[sq] == C.EMPTY for sq in C.BLACK_KINGSIDE_PATH) and
             all(not board._is_square_attacked(sq, 1) for sq in [C.BLACK_KING_START] + C.BLACK_KINGSIDE_PATH) and
@@ -177,7 +175,7 @@ def generate_king_moves(board, square):
             moves.append(Move.encode_move(C.BLACK_KING_START, C.BLACK_KINGSIDE_CASTLE, C.CASTLING))
         
         # queenside
-        if (board.black_king_pos == C.BLACK_KING_START and (board.castling & 0b1000) and
+        if (board.black_king_pos == C.BLACK_KING_START and (board.castling & C.CASTLE_BQ) and
             not board.is_in_check(-1) and
             all(board.squares[sq] == C.EMPTY for sq in C.BLACK_QUEENSIDE_PATH) and
             all(not board._is_square_attacked(sq, 1) for sq in [C.BLACK_KING_START] + C.BLACK_QUEENSIDE_PATH) and
