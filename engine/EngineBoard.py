@@ -1,6 +1,8 @@
+from engine.evaluation import evaluate
 from collections import Counter
-import constants as C
-import MoveGen
+from engine.move import Move
+import engine.constants as C
+import engine.MoveGen as MoveGen
 
 class Board:
     def __init__(self):
@@ -233,6 +235,8 @@ class Board:
             self.zobrist_key = self.compute_zobrist()
             self.repetitions[self.zobrist_key] -= 1
 
+        # assert self.compute_zobrist() == self.zobrist_key
+
     def enpassant_available(self):
         if self.en_passant == -1:
             return False
@@ -257,6 +261,9 @@ class Board:
                         return True
 
         return False
+
+    def evaluate(self):
+        return evaluate(self)
 
     def is_in_check(self, color):
         king_pos = self.white_king_pos if color == 1 else self.black_king_pos
@@ -287,6 +294,9 @@ class Board:
             self.halfmove >= 100 or
             self.is_insufficient_material()
         )
+
+    def is_terminal(self):
+        return self.is_checkmate() or self.is_draw()
 
     def count_pseudo_moves_for_side(self, side):
         old = self.turn
@@ -319,6 +329,9 @@ class Board:
         self.castling = C.CASTLE_ALL
         self.zobrist_key = self.compute_zobrist()
         self.repetitions[self.zobrist_key] += 1
+
+    def move_to_string(self, move):
+        return Move.move_to_string(move)
 
     def _update_castling_rights(self, from_sq, to_sq, piece, captured):
         # clear castling if king moves
@@ -460,3 +473,16 @@ class Board:
                     return True
 
         return False
+
+    def perft(self, depth):
+        if depth == 0:
+            return 1
+
+        nodes = 0
+        for move in self.generate_legal_moves():
+            self.make_move(move)
+            nodes += self.perft(depth - 1)
+            self.unmake_move()
+
+        return nodes
+

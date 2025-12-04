@@ -1,4 +1,4 @@
-import zobrist as Z
+import engine.zobrist as Z
 
 EMPTY = 0
 PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6

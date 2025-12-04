@@ -1,5 +1,5 @@
-from move import Move
-import constants as C
+from engine.move import Move
+import engine.constants as C
 
 def generate_pawn_moves(board, square):
     moves = []

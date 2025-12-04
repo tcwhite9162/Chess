@@ -1,11 +1,34 @@
+from helpers.gui_to_engine import convert_gui_to_engine, convert_engine_move_to_gui
 from renderer import render_board, render_gameover, render_clock
 from helpers.input import detect_promotion_click
+from engine.Search import search_best_move
 from helpers.setup import setup_from_fen
 from gamestate import GameState
 from game.board import Board
+from engine.EngineBoard import Board as EngineBoard
 import config as cfg
+import threading
 import pygame
 import sys
+
+engine_thinking = False
+def engine_play(board, gamestate, engine_board):
+    global engine_thinking
+    convert_gui_to_engine(board, engine_board, gamestate.turn)
+    best_move, score = search_best_move(engine_board, depth=3)
+    start, end = convert_engine_move_to_gui(best_move)
+
+    moving_piece = board.piece_at(*start)
+    captured_piece = board.piece_at(*end)
+    board.apply_move(start, end)
+    
+    gamestate.update_move_counters(moving_piece, captured_piece)
+    gamestate.toggle_turn()
+    gamestate.clock.switch_turn()
+
+    board.flag_for_redraw()
+    engine_thinking = False
+
 
 def main():
     pygame.init()
@@ -17,6 +40,11 @@ def main():
     setup_from_fen(cfg.START_FEN, board, gamestate, cfg.SQUARE_SIZE)
     gamestate.save_position(board)
     last_clock_update = 0
+
+    render_board(window, board, gamestate)
+
+    engine_board = EngineBoard()
+    engine_board.setup_starting_position()
 
     window.fill(gamestate.theme.active_colors()[2])
     render_clock(window, gamestate)
@@ -69,6 +97,10 @@ def main():
                 last_clock_update = pygame.time.get_ticks()
                 render_clock(window, gamestate)
 
+                global engine_thinking
+                if gamestate.turn == 'b' and not gamestate.status['is_gameover'] and not engine_thinking:
+                    engine_thinking = True
+                    threading.Thread(target=engine_play, args=(board, gamestate, engine_board)).start()
 
         if board.needs_rendered:
             render_board(window, board, gamestate)
